@@ -66,20 +66,14 @@ namespace OutlookManager.Scenarios
 
 		public static void MoveMail(string sourceAccountName, string sourceAccountFolder, string targetAccountName, string targetAccountFolder, int maxCount = 100)
 		{
-			//var sb = new StringBuilder();
-
 			//set up variables
 			Outlook.Application app;
 			Outlook.MAPIFolder? source;
 			Outlook.MAPIFolder? target;
 
-			//Outlook.Folders folders = null;
-
 			app = new Outlook.Application();
 
 			//source = app.Session.GetDefaultFolder(Outlook.OlDefaultFolders.olFolderSentMail);
-			//source = app.Session.Folders["robert.kummer@falah-capital.com"].Folders["Sent Items"];
-			//target = app.Session.Folders["FalahCapital_Archive"].Folders["Sent Items"];
 
 			source = app.Session.Folders[sourceAccountName]?.Folders[sourceAccountFolder];
 			target = app.Session.Folders[targetAccountName]?.Folders[targetAccountFolder];
@@ -91,17 +85,50 @@ namespace OutlookManager.Scenarios
 				throw new NullReferenceException($"Target: {targetAccountName}/{targetAccountFolder} is null.");
 
 
-			List<Outlook.MailItem> sourceItems;
-			sourceItems = OutlookInspector.GetMailItems(source, maxCount);
+			var sourceItems = OutlookInspector.GetMailItems(source, maxCount);
 
 			foreach (Outlook.MailItem item in sourceItems)
-			{
 				item.Move(target);
-			}
 
 
 			ReleaseObjects(app, source, target, sourceItems);
+		}
 
+		public static void MoveAppointments(string sourceAccountName, string sourceAccountFolder, string targetAccountName, string targetAccountFolder, int maxCount = 100)
+		{
+			Outlook.Application app;
+			Outlook.MAPIFolder? source;
+			Outlook.MAPIFolder? target;
+
+			app = new Outlook.Application();
+			source = app.Session.Folders[sourceAccountName]?.Folders[sourceAccountFolder];
+			target = app.Session.Folders[targetAccountName]?.Folders[targetAccountFolder];
+
+			if (source is null)
+				throw new NullReferenceException($"Source: {sourceAccountName}/{sourceAccountFolder} is null.");
+
+			if (target is null)
+				throw new NullReferenceException($"Target: {targetAccountName}/{targetAccountFolder} is null.");
+
+
+			List<Outlook.AppointmentItem> sourceItems;
+			var dtStart = new DateTime(2016, 1, 1);
+			var dtEnd = new DateTime(2022, 12, 5);
+			sourceItems = OutlookInspector.GetAppointmentItems(source, maxCount).Where(a => a.Start < dtEnd && a.Start > dtStart).OrderBy(a => a.Start).ToList();
+
+			foreach (Outlook.AppointmentItem item in sourceItems)
+				item.Move(target);
+
+
+			//var sb = new StringBuilder();
+			//foreach (Outlook.AppointmentItem item in sourceItems)
+			//{
+			//	sb.AppendLine($"{item.Start:s} -- {item.Subject.Left(20)}");
+			//}
+			//File.WriteAllText(@"D:\yy\tp2\AppointmentItems.txt", sb.ToString());
+
+
+			ReleaseObjects(app, source, target, null, sourceItems);
 		}
 
 		public static void CopyMailFromFileFolder(string sourcePath, string completedPath, string targetAccountName, string targetAccountFolder)
@@ -172,7 +199,13 @@ namespace OutlookManager.Scenarios
 		}
 
 
-		private static void ReleaseObjects(Outlook.Application? app, Outlook.MAPIFolder? source, Outlook.MAPIFolder? target, List<Outlook.MailItem>? mailItems)
+		private static void ReleaseObjects(
+			Outlook.Application? app,
+			Outlook.MAPIFolder? source,
+			Outlook.MAPIFolder? target,
+			List<Outlook.MailItem>? mailItems = null,
+			List<Outlook.AppointmentItem>? appointmentItems = null
+		)
 		{
 			//release objects
 
@@ -181,7 +214,18 @@ namespace OutlookManager.Scenarios
 				foreach (var item in mailItems)
 				{
 					if (item is not null)
-						System.Runtime.InteropServices.Marshal.ReleaseComObject(item);
+						Marshal.ReleaseComObject(item);
+				}
+				GC.WaitForPendingFinalizers();
+				GC.Collect();
+			}
+
+			if (appointmentItems != null)
+			{
+				foreach (var item in appointmentItems)
+				{
+					if (item is not null)
+						Marshal.ReleaseComObject(item);
 				}
 				GC.WaitForPendingFinalizers();
 				GC.Collect();
@@ -189,21 +233,21 @@ namespace OutlookManager.Scenarios
 
 			if (target != null)
 			{
-				System.Runtime.InteropServices.Marshal.ReleaseComObject(target);
+				Marshal.ReleaseComObject(target);
 				GC.WaitForPendingFinalizers();
 				GC.Collect();
 			}
 
 			if (source != null)
 			{
-				System.Runtime.InteropServices.Marshal.ReleaseComObject(source);
+				Marshal.ReleaseComObject(source);
 				GC.WaitForPendingFinalizers();
 				GC.Collect();
 			}
 
 			if (app != null)
 			{
-				System.Runtime.InteropServices.Marshal.ReleaseComObject(app);
+				Marshal.ReleaseComObject(app);
 				GC.WaitForPendingFinalizers();
 				GC.Collect();
 			}
